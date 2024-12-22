@@ -1,0 +1,132 @@
+---
+title: Loading <Img> with src http://localhost:3000/proxy
+source: Remotion Documentation
+last_updated: 2024-12-22
+---
+
+# Loading <Img> with src http://localhost:3000/proxy
+
+- [Home page](/)
+- Troubleshooting
+- Loading <Img> with src=http://localhost:3000/proxy...
+
+On this page
+
+# Loading <Img> with src http://localhost:3000/proxy
+
+The error message `A delayRender() "Loading <Img> with src=http://localhost:3000/proxy?src=[...]&time=[...]&transparent=[...]" was called but not cleared after 28000ms. See https://remotion.dev/docs/timeout for help`:
+
+```
+
+A delayRender() "Loading <Img> with src=http://localhost:3000/proxy?src=http%3A%2F%2Flocalhost%3A3000%2Fpublic%2Fbackground.mp4&time=683.45&transparent=false" was called but not cleared after 28000ms. See https://remotion.dev/docs/timeout for help
+```
+
+```
+
+A delayRender() "Loading <Img> with src=http://localhost:3000/proxy?src=http%3A%2F%2Flocalhost%3A3000%2Fpublic%2Fbackground.mp4&time=683.45&transparent=false" was called but not cleared after 28000ms. See https://remotion.dev/docs/timeout for help
+```
+
+occurs when loading an [`<OffthreadVideo>`](/docs/offthreadvideo) and the frame cannot be extracted within the [timeout](/docs/cli/render#--timeout).
+
+To be able to extract a frame, `<OffthreadVideo>` needs to:
+
+- Download the file in full
+- Open the file and seek to the correct position
+- Decode the frame and convert it into an image
+
+Especially for large files which take some time to download, this error may occur.
+
+## Increase the timeout [​](\#increase-the-timeout "Direct link to Increase the timeout")
+
+Consider increasing the timeout using the [`delayRenderTimeoutInMilliseconds`](/docs/offthreadvideo/#delayrendertimeoutinmilliseconds) prop.
+
+## Debug using verbose logging [​](\#debug-using-verbose-logging "Direct link to Debug using verbose logging")
+
+You can also [enable verbose logging](/docs/troubleshooting/debug-failed-render) to see the progress of the work that `<OffthreadVideo>` is doing. In the usual case, you can understand from the timings why the timeout occurred.
+
+## Chunk the video [​](\#chunk-the-video "Direct link to Chunk the video")
+
+Currently, `<OffthreadVideo>` needs to download the entire video in order to extract a frame (we work on eliminating this need in the future).
+
+If you are loading a large video, consider chunking it into smaller parts and only load part of the video at a time.
+
+For example, create a `<Series>` of `<OffthreadVideo>` components, each with a different `src` prop.
+
+```
+
+tsx
+
+import { Series, useVideoConfig, OffthreadVideo, staticFile } from "remotion";
+
+const parts = ["part1.mp4", "part2.mp4", "part3.mp4"];
+
+const SeriesTesting: React.FC = () => {
+  const { fps } = useVideoConfig();
+
+  return (
+    <Series>
+      {parts.map((part) => {
+        return (
+          <Series.Sequence durationInFrames={30 * 60}>
+            <OffthreadVideo src={staticFile(part)} />
+          </Series.Sequence>
+        );
+      })}
+    </Series>
+  );
+};
+```
+
+```
+
+tsx
+
+import { Series, useVideoConfig, OffthreadVideo, staticFile } from "remotion";
+
+const parts = ["part1.mp4", "part2.mp4", "part3.mp4"];
+
+const SeriesTesting: React.FC = () => {
+  const { fps } = useVideoConfig();
+
+  return (
+    <Series>
+      {parts.map((part) => {
+        return (
+          <Series.Sequence durationInFrames={30 * 60}>
+            <OffthreadVideo src={staticFile(part)} />
+          </Series.Sequence>
+        );
+      })}
+    </Series>
+  );
+};
+```
+
+## Use a faster CDN [​](\#use-a-faster-cdn "Direct link to Use a faster CDN")
+
+Ensure using a place to host your video that has enough egress bandwidth capacity.
+
+Place the video onto a server that is close to your render geographically.
+
+* * *
+
+If you believe this error was triggered by a bug in Remotion, please [open an issue](/docs/get-help).
+
+[Improve this page](https://github.com/remotion-dev/remotion/edit/main/packages/docs/docs/troubleshooting/delay-render-proxy.mdx)
+
+[Ask on Discord](https://remotion.dev/discord)
+
+[Get help](/docs/get-help)
+
+Last updated on **Dec 20, 2024**
+
+[Previous\
+\
+Timed out evaluating page function](/docs/troubleshooting/timed-out-page-function) [Next\
+\
+Calling bundle() in bundled code](/docs/troubleshooting/bundling-bundle)
+
+- [Increase the timeout](#increase-the-timeout)
+- [Debug using verbose logging](#debug-using-verbose-logging)
+- [Chunk the video](#chunk-the-video)
+- [Use a faster CDN](#use-a-faster-cdn)

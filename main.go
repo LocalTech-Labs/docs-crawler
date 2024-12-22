@@ -108,33 +108,137 @@ func formatMarkdown(title, content string) string {
 	return formatted.String()
 }
 
-func crawlURL(url string) ([]DocPage, error) {
+func crawlURL(baseURL string) ([]DocPage, error) {
 	// Normalize the input URL
-	url = normalizeURL(url)
+	baseURL = normalizeURL(baseURL)
+	fmt.Printf("Starting crawl from: %s\n", baseURL)
+
+	var pages []DocPage
+	processedLinks := make(map[string]bool)
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	// Create a channel for new URLs to crawl
+	urlQueue := make(chan string, 1000)
+	done := make(chan struct{})
+	urlQueue <- baseURL
+
+	// Create worker goroutines
+	maxWorkers := 5
+	fmt.Printf("Starting %d worker goroutines\n", maxWorkers)
+	for i := 0; i < maxWorkers; i++ {
+		wg.Add(1)
+		go func(workerID int) {
+			defer wg.Done()
+			for {
+				select {
+				case url, ok := <-urlQueue:
+					if !ok {
+						fmt.Printf("[Worker %d] Channel closed, exiting\n", workerID)
+						return
+					}
+
+					// Skip if we've already processed this URL
+					mu.Lock()
+					if processedLinks[url] {
+						mu.Unlock()
+						continue
+					}
+					processedLinks[url] = true
+					fmt.Printf("[Worker %d] Processing: %s\n", workerID, url)
+					mu.Unlock()
+
+					newPages, newLinks, err := crawlPage(url)
+					if err != nil {
+						fmt.Printf("[Worker %d] Error crawling %s: %v\n", workerID, url, err)
+						continue
+					}
+
+					mu.Lock()
+					pages = append(pages, newPages...)
+					fmt.Printf("[Worker %d] Found %d new pages and %d links on %s\n", workerID, len(newPages), len(newLinks), url)
+					
+					// Add new links to the queue
+					for _, link := range newLinks {
+						if !processedLinks[link] {
+							select {
+							case urlQueue <- link:
+								fmt.Printf("[Worker %d] Added new URL to queue: %s\n", workerID, link)
+							default:
+								fmt.Printf("[Worker %d] Queue full, skipping URL: %s\n", workerID, link)
+							}
+						}
+					}
+					mu.Unlock()
+
+				case <-done:
+					fmt.Printf("[Worker %d] Received done signal, exiting\n", workerID)
+					return
+				}
+			}
+		}(i)
+	}
+
+	// Start a goroutine to monitor progress
+	go func() {
+		lastCount := 0
+		stuckCount := 0
+		ticker := time.NewTicker(5 * time.Second)
+		defer ticker.Stop()
+
+		for {
+			select {
+			case <-ticker.C:
+				mu.Lock()
+				currentCount := len(pages)
+				if currentCount == lastCount {
+					stuckCount++
+					if stuckCount >= 3 { // No progress for 15 seconds
+						fmt.Println("No new pages found for 15 seconds, finishing crawl")
+						close(done)
+						mu.Unlock()
+						return
+					}
+				} else {
+					stuckCount = 0
+				}
+				lastCount = currentCount
+				fmt.Printf("Progress update: Found %d pages so far\n", currentCount)
+				mu.Unlock()
+			}
+		}
+	}()
+
+	// Wait for all workers to finish
+	wg.Wait()
+	fmt.Printf("All workers finished. Found total of %d pages\n", len(pages))
+
+	return pages, nil
+}
+
+func crawlPage(url string) ([]DocPage, []string, error) {
+	var pages []DocPage
+	var links []string
 
 	// Get the webpage
 	resp, err := http.Get(url)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("HTTP GET error: %v", err)
 	}
 	defer resp.Body.Close()
 
 	// Check if it's a 404 page
 	if resp.StatusCode == 404 {
-		return nil, fmt.Errorf("404 page not found")
+		return nil, nil, fmt.Errorf("404 page not found")
 	}
 
 	// Parse the HTML
 	doc, err := goquery.NewDocumentFromReader(resp.Body)
 	if err != nil {
-		return nil, err
+		return nil, nil, fmt.Errorf("HTML parsing error: %v", err)
 	}
 
-	var pages []DocPage
-	var links []string
-	processedLinks := make(map[string]bool)
-
-	// Process the initial page
+	// Process the page
 	title := doc.Find("h1").First().Text()
 	if title == "" {
 		title = doc.Find("title").First().Text()
@@ -146,7 +250,7 @@ func crawlURL(url string) ([]DocPage, error) {
 	if mainContent.Length() > 0 {
 		content, err := extractContent(mainContent)
 		if err != nil {
-			return nil, fmt.Errorf("error extracting content: %v", err)
+			return nil, nil, fmt.Errorf("content extraction error: %v", err)
 		}
 		markdown = formatMarkdown(title, content)
 	}
@@ -158,6 +262,8 @@ func crawlURL(url string) ([]DocPage, error) {
 		})
 	}
 
+	baseURL := "https://www.remotion.dev"
+
 	// Find all documentation links
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
 		href, exists := s.Attr("href")
@@ -165,8 +271,16 @@ func crawlURL(url string) ([]DocPage, error) {
 			return
 		}
 
-		// Skip external links, anchors, and non-doc pages
-		if strings.HasPrefix(href, "http") || strings.HasPrefix(href, "#") {
+		// Skip anchors and non-doc pages
+		if strings.HasPrefix(href, "#") {
+			return
+		}
+
+		// Handle absolute URLs
+		if strings.HasPrefix(href, "http") {
+			if strings.Contains(href, "remotion.dev/docs") {
+				links = append(links, href)
+			}
 			return
 		}
 
@@ -176,86 +290,16 @@ func crawlURL(url string) ([]DocPage, error) {
 		}
 
 		// Skip non-documentation pages
-		if !strings.Contains(href, "docs/") && !strings.HasPrefix(href, "docs") {
+		if !strings.Contains(href, "docs") {
 			return
 		}
 
 		// Construct absolute URL
-		absoluteURL := url
-		if strings.HasPrefix(href, "docs/") {
-			absoluteURL = strings.TrimSuffix(url, "/docs") + "/" + href
-		} else {
-			absoluteURL = strings.TrimSuffix(url, "/docs") + "/docs/" + strings.TrimPrefix(href, "docs/")
-		}
-
-		// Skip if we've already processed this URL
-		if processedLinks[absoluteURL] {
-			return
-		}
-		processedLinks[absoluteURL] = true
-
+		absoluteURL := fmt.Sprintf("%s/%s", baseURL, href)
 		links = append(links, absoluteURL)
 	})
 
-	var wg sync.WaitGroup
-	var mu sync.Mutex
-
-	// Process each link
-	for _, link := range links {
-		wg.Add(1)
-		go func(link string) {
-			defer wg.Done()
-
-			resp, err := http.Get(link)
-			if err != nil {
-				fmt.Printf("Error fetching %s: %v\n", link, err)
-				return
-			}
-			defer resp.Body.Close()
-
-			// Skip 404 pages
-			if resp.StatusCode == 404 {
-				fmt.Printf("Skipping 404 page: %s\n", link)
-				return
-			}
-
-			doc, err := goquery.NewDocumentFromReader(resp.Body)
-			if err != nil {
-				fmt.Printf("Error parsing %s: %v\n", link, err)
-				return
-			}
-
-			title := doc.Find("h1").First().Text()
-			if title == "" {
-				title = doc.Find("title").First().Text()
-			}
-
-			// Find the main content
-			var markdown string
-			mainContent := doc.Find("article, .markdown, .content, main, #main-content").First()
-			if mainContent.Length() > 0 {
-				content, err := extractContent(mainContent)
-				if err != nil {
-					fmt.Printf("Error extracting content from %s: %v\n", link, err)
-					return
-				}
-				markdown = formatMarkdown(title, content)
-			}
-
-			if title != "" && markdown != "" {
-				page := DocPage{
-					Title:    title,
-					Markdown: markdown,
-				}
-				mu.Lock()
-				pages = append(pages, page)
-				mu.Unlock()
-			}
-		}(link)
-	}
-
-	wg.Wait()
-	return pages, nil
+	return pages, links, nil
 }
 
 func writeResults(pages []DocPage, dirPath string) error {
@@ -292,28 +336,32 @@ func main() {
 
 	if url == "" {
 		fmt.Println("Error: URL is required")
-		os.Exit(1)
+		return
 	}
 
-	fmt.Println("Starting to crawl ...")
+	fmt.Println("Starting to crawl", url, "...")
+
+	// Create output directories
+	dirPath, err := createDirectories(url)
+	if err != nil {
+		fmt.Printf("Error creating directories: %v\n", err)
+		return
+	}
+
+	// Crawl the website
 	pages, err := crawlURL(url)
 	if err != nil {
 		fmt.Printf("Error crawling website: %v\n", err)
-		os.Exit(1)
+		return
 	}
 
-	// Create output directory
-	outputDir := filepath.Join(".", "generated_docs", strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://"))
-	if err := os.MkdirAll(filepath.Join(outputDir, "markdown"), 0755); err != nil {
-		fmt.Printf("Error creating output directory: %v\n", err)
-		os.Exit(1)
-	}
+	fmt.Printf("Found %d pages\n", len(pages))
 
-	// Write results
-	if err := writeResults(pages, outputDir); err != nil {
+	// Write results to files
+	if err := writeResults(pages, dirPath); err != nil {
 		fmt.Printf("Error writing results: %v\n", err)
-		os.Exit(1)
+		return
 	}
 
-	fmt.Printf("Successfully crawled %d pages. Results written to %s\n", len(pages), outputDir)
+	fmt.Println("Crawling completed successfully!")
 }
