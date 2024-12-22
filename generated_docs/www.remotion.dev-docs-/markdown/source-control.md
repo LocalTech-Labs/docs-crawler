@@ -75,7 +75,7 @@ bash
 git lfs install
 ```
 
-3. Configure Git LFS to track all .mp4 files located in the /public and all its subfolders:
+1. Configure Git LFS to track all .mp4 files located in the /public and all its subfolders:
 
 ```
 

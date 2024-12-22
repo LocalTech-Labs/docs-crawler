@@ -7,11 +7,13 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"strconv"
 	"sync"
 	"time"
 
 	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
+	"github.com/temoto/robotstxt"
 )
 
 type DocPage struct {
@@ -108,25 +110,121 @@ func formatMarkdown(title, content string) string {
 	return formatted.String()
 }
 
+type RateLimiter struct {
+	ticker *time.Ticker
+}
+
+func NewRateLimiter(delay time.Duration) *RateLimiter {
+	return &RateLimiter{
+		ticker: time.NewTicker(delay),
+	}
+}
+
+func (r *RateLimiter) Wait() {
+	<-r.ticker.C
+}
+
+func (r *RateLimiter) Stop() {
+	r.ticker.Stop()
+}
+
 func crawlURL(baseURL string) ([]DocPage, error) {
+	// Check robots.txt first
+	fmt.Println("Checking robots.txt...")
+	robotsURL := "https://www.remotion.dev/robots.txt"
+	resp, err := http.Get(robotsURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to fetch robots.txt: %v", err)
+	}
+	defer resp.Body.Close()
+
+	robots, err := robotstxt.FromResponse(resp)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse robots.txt: %v", err)
+	}
+
+	group := robots.FindGroup("*")
+	if group != nil && !group.Test("/docs") {
+		return nil, fmt.Errorf("crawling /docs is not allowed by robots.txt")
+	}
+
+	// Get crawl delay from robots.txt, default to 1 second if not specified
+	crawlDelay := 1 * time.Second
+	if group != nil && group.CrawlDelay > 0 {
+		crawlDelay = time.Duration(group.CrawlDelay) * time.Second
+	}
+
+	// Create rate limiter
+	rateLimiter := NewRateLimiter(crawlDelay)
+	defer rateLimiter.Stop()
+
 	// Normalize the input URL
 	baseURL = normalizeURL(baseURL)
-	fmt.Printf("Starting crawl from: %s\n", baseURL)
+	fmt.Printf("\nStarting crawl from: %s\n", baseURL)
+	fmt.Printf("Rate limit: %v between requests\n", crawlDelay)
+
+	// Default to 4 workers as it provides optimal parallelization while staying
+	// well within typical browser connection limits. Combined with rate limiting,
+	// this gives good performance without overwhelming the target server.
+	workers := 4
+	if len(os.Args) > 2 {
+		if w, err := strconv.Atoi(os.Args[2]); err == nil && w > 0 {
+			workers = w
+		}
+	}
+
+	fmt.Printf("Number of workers: %d\n\n", workers)
 
 	var pages []DocPage
 	processedLinks := make(map[string]bool)
+	queuedLinks := make(map[string]bool)
 	var mu sync.Mutex
 	var wg sync.WaitGroup
 
 	// Create a channel for new URLs to crawl
 	urlQueue := make(chan string, 1000)
 	done := make(chan struct{})
+	
+	// Add initial URL
 	urlQueue <- baseURL
+	queuedLinks[baseURL] = true
+
+	// Stats
+	processedCount := 0
+	queuedCount := 1
+	lastProcessedCount := 0
+	lastQueuedCount := 1
+
+	// Progress reporting goroutine
+	ticker := time.NewTicker(5 * time.Second)
+	go func() {
+		for {
+			select {
+			case <-ticker.C:
+				mu.Lock()
+				currentProcessed := processedCount
+				currentQueued := queuedCount
+				newProcessed := currentProcessed - lastProcessedCount
+				newQueued := currentQueued - lastQueuedCount
+				fmt.Printf("\nProgress Update:\n")
+				fmt.Printf("- Pages processed: %d (+ %d new)\n", currentProcessed, newProcessed)
+				fmt.Printf("- Pages queued: %d (+ %d new)\n", currentQueued, newQueued)
+				fmt.Printf("- Pages found: %d\n", len(pages))
+				if newProcessed == 0 && newQueued == 0 {
+					fmt.Printf("(Crawler is still working, but no new pages in the last 5 seconds)\n")
+				}
+				lastProcessedCount = currentProcessed
+				lastQueuedCount = currentQueued
+				mu.Unlock()
+			case <-done:
+				ticker.Stop()
+				return
+			}
+		}
+	}()
 
 	// Create worker goroutines
-	maxWorkers := 5
-	fmt.Printf("Starting %d worker goroutines\n", maxWorkers)
-	for i := 0; i < maxWorkers; i++ {
+	for i := 0; i < workers; i++ {
 		wg.Add(1)
 		go func(workerID int) {
 			defer wg.Done()
@@ -134,76 +232,76 @@ func crawlURL(baseURL string) ([]DocPage, error) {
 				select {
 				case url, ok := <-urlQueue:
 					if !ok {
-						fmt.Printf("[Worker %d] Channel closed, exiting\n", workerID)
 						return
 					}
 
-					// Skip if we've already processed this URL
 					mu.Lock()
 					if processedLinks[url] {
 						mu.Unlock()
 						continue
 					}
 					processedLinks[url] = true
-					fmt.Printf("[Worker %d] Processing: %s\n", workerID, url)
+					processedCount++
 					mu.Unlock()
+
+					// Wait for rate limiter before making request
+					rateLimiter.Wait()
 
 					newPages, newLinks, err := crawlPage(url)
 					if err != nil {
-						fmt.Printf("[Worker %d] Error crawling %s: %v\n", workerID, url, err)
+						fmt.Printf("Error crawling %s: %v\n", url, err)
 						continue
 					}
 
 					mu.Lock()
 					pages = append(pages, newPages...)
-					fmt.Printf("[Worker %d] Found %d new pages and %d links on %s\n", workerID, len(newPages), len(newLinks), url)
 					
 					// Add new links to the queue
 					for _, link := range newLinks {
-						if !processedLinks[link] {
+						if !processedLinks[link] && !queuedLinks[link] {
 							select {
 							case urlQueue <- link:
-								fmt.Printf("[Worker %d] Added new URL to queue: %s\n", workerID, link)
+								queuedLinks[link] = true
+								queuedCount++
 							default:
-								fmt.Printf("[Worker %d] Queue full, skipping URL: %s\n", workerID, link)
+								fmt.Printf("Queue full, skipping URL: %s\n", link)
 							}
 						}
 					}
 					mu.Unlock()
 
 				case <-done:
-					fmt.Printf("[Worker %d] Received done signal, exiting\n", workerID)
 					return
 				}
 			}
 		}(i)
 	}
 
-	// Start a goroutine to monitor progress
+	// Monitor for completion (no progress for 15 seconds)
 	go func() {
+		noProgressCount := 0
 		lastCount := 0
-		stuckCount := 0
-		ticker := time.NewTicker(5 * time.Second)
-		defer ticker.Stop()
+		checkTicker := time.NewTicker(5 * time.Second)
+		defer checkTicker.Stop()
 
 		for {
 			select {
-			case <-ticker.C:
+			case <-checkTicker.C:
 				mu.Lock()
 				currentCount := len(pages)
 				if currentCount == lastCount {
-					stuckCount++
-					if stuckCount >= 3 { // No progress for 15 seconds
-						fmt.Println("No new pages found for 15 seconds, finishing crawl")
+					noProgressCount++
+					if noProgressCount >= 3 { // No progress for 15 seconds
+						fmt.Println("\nNo new pages found for 15 seconds, finishing crawl...")
+						close(urlQueue)
 						close(done)
 						mu.Unlock()
 						return
 					}
 				} else {
-					stuckCount = 0
+					noProgressCount = 0
 				}
 				lastCount = currentCount
-				fmt.Printf("Progress update: Found %d pages so far\n", currentCount)
 				mu.Unlock()
 			}
 		}
@@ -211,7 +309,9 @@ func crawlURL(baseURL string) ([]DocPage, error) {
 
 	// Wait for all workers to finish
 	wg.Wait()
-	fmt.Printf("All workers finished. Found total of %d pages\n", len(pages))
+	fmt.Printf("\nCrawl completed!\n")
+	fmt.Printf("Total pages processed: %d\n", processedCount)
+	fmt.Printf("Total pages found: %d\n", len(pages))
 
 	return pages, nil
 }

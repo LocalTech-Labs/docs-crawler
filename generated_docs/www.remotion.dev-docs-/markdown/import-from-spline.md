@@ -44,27 +44,27 @@ note
 
 The camera rotation can be changed by clicking and dragging while holding the `Alt` (Windows) or `Option` (Mac) key.
 
-7. Center the Torus by right clicking on it, scrolling down and selecting `Reset Position`. Alternatively, you can enter 0 in all three fields of the Position row on the right.
+1. Center the Torus by right clicking on it, scrolling down and selecting `Reset Position`. Alternatively, you can enter 0 in all three fields of the Position row on the right.
 
-8. Scale the Torus by a factor of two by entering `2` in all three fields of the Scale row.
+2. Scale the Torus by a factor of two by entering `2` in all three fields of the Scale row.
 
 ![Position Options](data:image/png;base64,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)
 
-9. You can play around with the different fields in the **Shape** section to modify the Torus, however we will continue with the default properties.
+3. You can play around with the different fields in the **Shape** section to modify the Torus, however we will continue with the default properties.
 
 ![Shape Options](/assets/images/6_shape_options-a161b10ce43142eee4be53fd4a06a0fc.png)
 
-10. Scroll down to the **Material** section in the right column, click on the textbox beside the colour picker and enter `3489DC` or any color you like. Effects on the 3D object in Spline are applied as layers, let's add another effect.
+4. Scroll down to the **Material** section in the right column, click on the textbox beside the colour picker and enter `3489DC` or any color you like. Effects on the 3D object in Spline are applied as layers, let's add another effect.
 
-11. Click on the **+** icon in the **Material** section, and from the dropdown select **Noise**
+5. Click on the **+** icon in the **Material** section, and from the dropdown select **Noise**
 
 ![Noise Layer](/assets/images/7_noise_layer-666d03266d35b2c66fa4f7b3eac9b296.png)
 
-12. You'll notice that the colour you previously chose has been replaced by black and white noise, this is because the noise layer is covering all the layers below it. In order to fix this, click on the icon to the right of 100 in the noise row and select **overlay**.
+6. You'll notice that the colour you previously chose has been replaced by black and white noise, this is because the noise layer is covering all the layers below it. In order to fix this, click on the icon to the right of 100 in the noise row and select **overlay**.
 
 ![Overlay](/assets/images/8_overlay-5ad3958552bb2de34af4013afccd7385.png)
 
-13. Finally, let's change the noise type, just for better visuals. Click on the squiggly lines beside noise, select **Simplex Fractal** and set **Movement** to 2.
+7. Finally, let's change the noise type, just for better visuals. Click on the squiggly lines beside noise, select **Simplex Fractal** and set **Movement** to 2.
 
 ![Change Noise Type](/assets/images/9_change_noise_type-0d3bb8f5a9aa26f25df9e79c6628df93.png)
 
@@ -72,8 +72,8 @@ Your 3D model should look like this:
 
 ![Completed Torus](/assets/images/10_completed_torus-2cdca9f3c25f0f0a2ce1c7a18c1508a1.png)
 
-14. Click on **Directional Light** in the left column, and press `Backspace` key because we don't need it anymore.
-15. Click **Export** in the top menu. Click on the first dropdown and select **Code (Experimental)**. Select **react-three-fiber** in the second dropdown. Finally, click on the Copy icon in the code section to copy the generated code.
+1. Click on **Directional Light** in the left column, and press `Backspace` key because we don't need it anymore.
+2. Click **Export** in the top menu. Click on the first dropdown and select **Code (Experimental)**. Select **react-three-fiber** in the second dropdown. Finally, click on the Copy icon in the code section to copy the generated code.
 
 ![Export Model Code](/assets/images/11_export_model_code-ca272998643b6c912a95e78252921501.png)
 
@@ -148,7 +148,7 @@ export const Scene: React.FC = () => {
 };
 ```
 
-7. Add the following imports to `src/Torus.tsx`:
+1. Add the following imports to `src/Torus.tsx`:
 
 ```
 
@@ -170,7 +170,7 @@ import {useThree} from '@react-three/fiber';
 import {interpolate, spring, useCurrentFrame, useVideoConfig} from 'remotion';
 ```
 
-8. Add the following code inside the Torus function below the `useSpline()` call:
+1. Add the following code inside the Torus function below the `useSpline()` call:
 
 ```
 
@@ -222,7 +222,7 @@ useEffect(() => {
 }, [camera]);
 ```
 
-9. Let's add some animation. Below the above code, insert the following:
+1. Let's add some animation. Below the above code, insert the following:
 
 ```
 
@@ -267,7 +267,7 @@ const entranceAnimation = spring({
 - `constantRotation` will cause the Torus to rotate forever. Math.PI \* 2 equals a complete 360 degree rotation.
 - `entranceAnimation` animates from 0 to 1 over time using a spring animation.
 
-10. Find the `<mesh>` element and replace it's `scale` and `rotation` parameters with:
+1. Find the `<mesh>` element and replace it's `scale` and `rotation` parameters with:
 
 ```
 
@@ -289,9 +289,9 @@ note
 
 The X rotation is half of the Y rotation, so for every 2 turns in the Y axis, our Torus will turn once in the X axis.
 
-11. That's it! See a rotating Torus in the Remotion Studio.
+1. That's it! See a rotating Torus in the Remotion Studio.
 
-12. If you want to export your video to a MP4 video file, run:
+2. If you want to export your video to a MP4 video file, run:
 
 ```
 

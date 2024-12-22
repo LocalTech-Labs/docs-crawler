@@ -141,7 +141,7 @@ bash
 pnpm i -D @remotion/tailwind
 ```
 
-2. Add the Webpack override from `@remotion/tailwind` to your config file:
+1. Add the Webpack override from `@remotion/tailwind` to your config file:
 
 ```
 
@@ -173,19 +173,9 @@ note
 
 Prior to `v3.3.39`, the option was called `Config.Bundling.overrideWebpackConfig()`.
 
-3. If you use the [`bundle()` or `deploySite()` Node.JS API, add the Webpack override to it as well](/docs/webpack#when-using-bundle-and-deploysite).
+1. If you use the [`bundle()` or `deploySite()` Node.JS API, add the Webpack override to it as well](/docs/webpack#when-using-bundle-and-deploysite).
 
-4. Create a file `src/style.css` with the following content:
-
-```
-
-src/style.css
-css
-
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-```
+2. Create a file `src/style.css` with the following content:
 
 ```
 
@@ -197,7 +187,17 @@ css
 @tailwind utilities;
 ```
 
-5. Import the stylesheet in your `src/Root.tsx` file. Add to the top of the file:
+```
+
+src/style.css
+css
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+```
+
+1. Import the stylesheet in your `src/Root.tsx` file. Add to the top of the file:
 
 ```
 
@@ -215,7 +215,7 @@ js
 import './style.css';
 ```
 
-6. Add a `tailwind.config.js` file to the root of your project:
+1. Add a `tailwind.config.js` file to the root of your project:
 
 ```
 
@@ -247,7 +247,7 @@ module.exports = {
 };
 ```
 
-7. Ensure your `package.json` does not have `"sideEffects": false` set. If it has, declare that CSS files have a side effect:
+1. Ensure your `package.json` does not have `"sideEffects": false` set. If it has, declare that CSS files have a side effect:
 
 ```
 
@@ -273,7 +273,7 @@ diff
 }
 ```
 
-8. Start using TailwindCSS! You can verify that it's working by adding `className="bg-red-900"` to any element.
+1. Start using TailwindCSS! You can verify that it's working by adding `className="bg-red-900"` to any element.
 
 note
 

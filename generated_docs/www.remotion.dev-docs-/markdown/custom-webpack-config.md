@@ -297,7 +297,7 @@ yarn --exact add @mdx-js/loader @mdx-js/reactCopy
 yarn --exact add @mdx-js/loader @mdx-js/reactCopy
 ```
 
-2. Create a file with the Webpack override:
+1. Create a file with the Webpack override:
 
 ```
 
@@ -357,7 +357,7 @@ export const enableMdx: WebpackOverrideFn = (currentConfiguration) => {
 };
 ```
 
-3. Add it to the config file:
+1. Add it to the config file:
 
 ```
 
@@ -381,9 +381,9 @@ import {enableMdx} from './src/enable-mdx';
 Config.overrideWebpackConfig(enableMdx);
 ```
 
-4. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
+1. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
 
-5. Create a file which contains `declare module '*.mdx';` in your project to fix a TypeScript error showing up.
+2. Create a file which contains `declare module '*.mdx';` in your project to fix a TypeScript error showing up.
 
 ### Enable TailwindCSS support [​](\#enable-tailwindcss-support "Direct link to Enable TailwindCSS support")
 
@@ -447,7 +447,7 @@ yarn --exact add @svgr/webpackCopy
 yarn --exact add @svgr/webpackCopy
 ```
 
-2. Declare an override function:
+1. Declare an override function:
 
 ```
 
@@ -535,7 +535,7 @@ export const enableSvgr: WebpackOverrideFn = (currentConfiguration) => {
 };
 ```
 
-3. Add the override function to your [`remotion.config.ts`](/docs/config) file:
+1. Add the override function to your [`remotion.config.ts`](/docs/config) file:
 
 ```
 
@@ -559,9 +559,9 @@ import {enableSvgr} from './src/enable-svgr';
 Config.overrideWebpackConfig(enableSvgr);
 ```
 
-4. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
+1. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
 
-5. Restart the Remotion Studio.
+2. Restart the Remotion Studio.
 
 ### Enable support for GLSL imports [​](\#enable-support-for-glsl-imports "Direct link to Enable support for GLSL imports")
 
@@ -612,7 +612,7 @@ yarn --exact add glsl-shader-loader glslify glslify-import-loader raw-loaderCopy
 yarn --exact add glsl-shader-loader glslify glslify-import-loader raw-loaderCopy
 ```
 
-2. Declare a webpack override:
+1. Declare a webpack override:
 
 ```
 
@@ -690,7 +690,7 @@ import {enableGlsl} from './src/enable-glsl';
 Config.overrideWebpackConfig(enableGlsl);
 ```
 
-3. Add the following to your [entry point](/docs/terminology/entry-point) (e.g. `src/index.ts`):
+1. Add the following to your [entry point](/docs/terminology/entry-point) (e.g. `src/index.ts`):
 
 ```
 
@@ -712,11 +712,11 @@ declare module '*.glsl' {
 }
 ```
 
-4. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
+1. Add it to your [Node.JS API calls as well if necessary](#when-using-bundle-and-deploysite).
 
-5. Reset the webpack cache by deleting the `node_modules/.cache` folder.
+2. Reset the webpack cache by deleting the `node_modules/.cache` folder.
 
-6. Restart the Remotion Studio.
+3. Restart the Remotion Studio.
 
 ### Enable WebAssembly [​](\#enable-webassembly "Direct link to Enable WebAssembly")
 

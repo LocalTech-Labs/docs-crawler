@@ -7,36 +7,36 @@ last_updated: 2024-12-22
 # Light client
 
 - [Home page](/)
-- [Lambda](/docs/lambda)
+- [Cloud Run](/docs/cloudrun-alpha)
 - Light client
 
 # Light client
 
-The following methods and types can be imported from `@remotion/lambda/client`:
+_available from v4.0.84_
+
+The following methods and types can be imported from `@remotion/cloudrun/client`:
 
 ```
 
 tsx
 
 import {
-  renderMediaOnLambda,
-  renderStillOnLambda,
-  getRenderProgress,
-  getCompositionsOnLambda,
-  getFunctions,
-  AwsRegion,
-  RenderProgress,
-  validateWebhookSignature,
-  WebhookPayload,
-  presignUrl,
-  PresignUrlInput,
+  deleteService,
+  deleteSite,
+  getOrCreateBucket,
+  getRegions,
+  getServiceInfo,
+  getServices,
   getSites,
-  speculateFunctionName,
-  CustomCredentials, // available from v4.0.60
-  getAwsClient, // available from v4.0.82
-  deleteRender, // available from v4.0.84
-  DeleteRenderInput, // available from v4.0.84
-} from "@remotion/lambda/client";
+  renderMediaOnCloudrun,
+  renderStillOnCloudrun,
+  speculateServiceName,
+} from "@remotion/cloudrun/client";
+
+import type {
+  RenderMediaOnCloudrunInput,
+  RenderStillOnCloudrunInput,
+} from "@remotion/cloudrun/client";
 ```
 
 ```
@@ -44,41 +44,35 @@ import {
 tsx
 
 import {
-  renderMediaOnLambda,
-  renderStillOnLambda,
-  getRenderProgress,
-  getCompositionsOnLambda,
-  getFunctions,
-  AwsRegion,
-  RenderProgress,
-  validateWebhookSignature,
-  WebhookPayload,
-  presignUrl,
-  PresignUrlInput,
+  deleteService,
+  deleteSite,
+  getOrCreateBucket,
+  getRegions,
+  getServiceInfo,
+  getServices,
   getSites,
-  speculateFunctionName,
-  CustomCredentials, // available from v4.0.60
-  getAwsClient, // available from v4.0.82
-  deleteRender, // available from v4.0.84
-  DeleteRenderInput, // available from v4.0.84
-} from "@remotion/lambda/client";
+  renderMediaOnCloudrun,
+  renderStillOnCloudrun,
+  speculateServiceName,
+} from "@remotion/cloudrun/client";
+
+import type {
+  RenderMediaOnCloudrunInput,
+  RenderStillOnCloudrunInput,
+} from "@remotion/cloudrun/client";
 ```
-
-info
-
-`getServiceClient()` was included from v4.0.60 to v4.0.81 by mistake. Use [`getAwsClient()`](/docs/lambda/getawsclient) instead.
 
 These functions don't have any dependencies on our renderer and can be bundled for example with ESBuild or Webpack (like is the case for example in Next.js).
 
 Importing the light client on edge frameworks (Vercel Edge, Cloudflare Workers) is currently not supported.
 
-**We don't recommend calling these functions from the browser directly, as you will leak your AWS credentials.**
+**We don't recommend calling these functions from the browser directly, as you will leak your Google Cloud Platform credentials.**
 
-Instead, this light client is meant to reduce the bundle size and avoid problems if you are calling Remotion Lambda APIs from another Lambda function and therefore need to bundle your function code.
+Instead, this light client is meant to reduce the bundle size and avoid problems if you are calling Remotion Cloud Run APIs from another serverless function and therefore need to bundle your function code.
 
-Commonly, Next.JS serverless endpoints or similar use AWS Lambda functions under the hood, for which `@remotion/lambda/client` can be used.
+This import is useful for example for Next.js serverless endpoints or similar, which bundle the server-side code.
 
-[Improve this page](https://github.com/remotion-dev/remotion/edit/main/packages/docs/docs/lambda/light-client.mdx)
+[Improve this page](https://github.com/remotion-dev/remotion/edit/main/packages/docs/docs/cloudrun/light-client.mdx)
 
 [Ask on Discord](https://remotion.dev/discord)
 
@@ -88,6 +82,6 @@ Last updated on **Dec 20, 2024**
 
 [Previous\
 \
-FAQ](/docs/lambda/faq) [Next\
+Limits](/docs/cloudrun/limits) [Next\
 \
-Custom Layers](/docs/lambda/custom-layers)
+Upgrading Cloud Run](/docs/cloudrun/upgrading)

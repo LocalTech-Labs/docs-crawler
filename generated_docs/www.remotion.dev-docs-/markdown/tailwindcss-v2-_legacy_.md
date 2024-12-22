@@ -58,7 +58,7 @@ bash
 yarn add postcss-loader postcss postcss-preset-env tailwindcss@2 autoprefixer
 ```
 
-2. Add the following to your [`remotion.config.ts`](/docs/config) file:
+1. Add the following to your [`remotion.config.ts`](/docs/config) file:
 
 ```
 
@@ -160,7 +160,7 @@ Config.overrideWebpackConfig((currentConfiguration) => {
 });
 ```
 
-3. Create a file `src/style.css` with the following content:
+1. Create a file `src/style.css` with the following content:
 
 ```
 
@@ -180,7 +180,7 @@ css
 @tailwind utilities;
 ```
 
-4. Import the stylesheet in your `src/Root.tsx` file. Add to the top of the file:
+1. Import the stylesheet in your `src/Root.tsx` file. Add to the top of the file:
 
 ```
 
@@ -196,9 +196,9 @@ js
 import "./style.css";
 ```
 
-5. Start using TailwindCSS! You can verify that it's working by adding `className="bg-red-900"` to any element.
+1. Start using TailwindCSS! You can verify that it's working by adding `className="bg-red-900"` to any element.
 
-6. _Optional_: Add a `tailwind.config.js` file to the root of your project. Add `/* eslint-env node */` to the top of the file to get rid of an ESLint rule complaining that `module` is not defined.
+2. _Optional_: Add a `tailwind.config.js` file to the root of your project. Add `/* eslint-env node */` to the top of the file to get rid of an ESLint rule complaining that `module` is not defined.
 
 warning
 
