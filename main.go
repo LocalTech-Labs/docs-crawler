@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bufio"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -11,8 +10,8 @@ import (
 	"sync"
 	"time"
 
+	md "github.com/JohannesKaufmann/html-to-markdown"
 	"github.com/PuerkitoBio/goquery"
-	"github.com/schollz/progressbar/v3"
 )
 
 type DocPage struct {
@@ -22,9 +21,8 @@ type DocPage struct {
 
 func createDirectories(baseURL string) (string, error) {
 	// Create base directory
-	timestamp := time.Now().Format("2006-01-02-15-04-05")
-	sanitizedURL := strings.ReplaceAll(strings.ReplaceAll(baseURL, "https://", ""), "/", "-")
-	dirPath := filepath.Join("generated_docs", sanitizedURL+"-"+timestamp)
+	timestamp := strings.ReplaceAll(strings.ReplaceAll(baseURL, "https://", ""), "/", "-")
+	dirPath := filepath.Join("generated_docs", timestamp)
 	
 	if err := os.MkdirAll(filepath.Join(dirPath, "markdown"), 0755); err != nil {
 		return "", err
@@ -35,6 +33,79 @@ func createDirectories(baseURL string) (string, error) {
 
 func normalizeURL(url string) string {
 	return strings.TrimSuffix(url, "/")
+}
+
+func extractContent(s *goquery.Selection) (string, error) {
+	// Create a new converter
+	converter := md.NewConverter("", true, nil)
+
+	// Get the HTML content
+	html, err := s.Html()
+	if err != nil {
+		return "", err
+	}
+
+	// Convert HTML to Markdown
+	markdown, err := converter.ConvertString(html)
+	if err != nil {
+		return "", err
+	}
+
+	// Clean up the markdown
+	markdown = strings.ReplaceAll(markdown, "\n\n\n", "\n\n") // Remove excessive newlines
+	
+	// Ensure content ends with a newline
+	if !strings.HasSuffix(markdown, "\n") {
+		markdown += "\n"
+	}
+	
+	return markdown, nil
+}
+
+func sanitizeFilename(title string) string {
+	// Convert to lowercase
+	name := strings.ToLower(title)
+	
+	// Replace special characters with underscores
+	name = strings.Map(func(r rune) rune {
+		switch {
+		case r >= 'a' && r <= 'z':
+			return r
+		case r >= '0' && r <= '9':
+			return r
+		case r == ' ' || r == '-':
+			return '-'
+		default:
+			return '_'
+		}
+	}, name)
+	
+	// Replace multiple dashes/underscores with single ones
+	name = strings.ReplaceAll(name, "--", "-")
+	name = strings.ReplaceAll(name, "__", "_")
+	
+	return name + ".md"
+}
+
+func formatMarkdown(title, content string) string {
+	var formatted strings.Builder
+
+	// Add metadata section
+	formatted.WriteString("---\n")
+	formatted.WriteString(fmt.Sprintf("title: %s\n", title))
+	formatted.WriteString(fmt.Sprintf("source: Remotion Documentation\n"))
+	formatted.WriteString(fmt.Sprintf("last_updated: %s\n", time.Now().Format("2006-01-02")))
+	formatted.WriteString("---\n\n")
+
+	// Add title if not present
+	if !strings.HasPrefix(content, "# ") {
+		formatted.WriteString(fmt.Sprintf("# %s\n\n", title))
+	}
+
+	// Add the main content
+	formatted.WriteString(content)
+
+	return formatted.String()
 }
 
 func crawlURL(url string) ([]DocPage, error) {
@@ -73,7 +144,11 @@ func crawlURL(url string) ([]DocPage, error) {
 	var markdown string
 	mainContent := doc.Find("article, .markdown, .content, main, #main-content").First()
 	if mainContent.Length() > 0 {
-		markdown = mainContent.Text()
+		content, err := extractContent(mainContent)
+		if err != nil {
+			return nil, fmt.Errorf("error extracting content: %v", err)
+		}
+		markdown = formatMarkdown(title, content)
 	}
 
 	if title != "" && markdown != "" && !strings.Contains(title, "Page Not Found") {
@@ -82,8 +157,6 @@ func crawlURL(url string) ([]DocPage, error) {
 			Markdown: markdown,
 		})
 	}
-
-	baseURL := strings.TrimSuffix(url, "/")
 
 	// Find all documentation links
 	doc.Find("a").Each(func(i int, s *goquery.Selection) {
@@ -108,17 +181,12 @@ func crawlURL(url string) ([]DocPage, error) {
 		}
 
 		// Construct absolute URL
-		absoluteURL := baseURL
+		absoluteURL := url
 		if strings.HasPrefix(href, "docs/") {
-			absoluteURL = strings.TrimSuffix(baseURL, "/docs") + "/" + href
-		} else if strings.HasPrefix(href, "/docs/") {
-			absoluteURL = strings.TrimSuffix(baseURL, "/docs") + href
+			absoluteURL = strings.TrimSuffix(url, "/docs") + "/" + href
 		} else {
-			absoluteURL = baseURL + "/" + strings.TrimPrefix(href, "/")
+			absoluteURL = strings.TrimSuffix(url, "/docs") + "/docs/" + strings.TrimPrefix(href, "docs/")
 		}
-
-		// Normalize the absolute URL
-		absoluteURL = normalizeURL(absoluteURL)
 
 		// Skip if we've already processed this URL
 		if processedLinks[absoluteURL] {
@@ -129,10 +197,6 @@ func crawlURL(url string) ([]DocPage, error) {
 		links = append(links, absoluteURL)
 	})
 
-	// Create a progress bar
-	bar := progressbar.Default(int64(len(links)))
-
-	// Use a WaitGroup to handle concurrent crawling
 	var wg sync.WaitGroup
 	var mu sync.Mutex
 
@@ -141,7 +205,6 @@ func crawlURL(url string) ([]DocPage, error) {
 		wg.Add(1)
 		go func(link string) {
 			defer wg.Done()
-			defer bar.Add(1)
 
 			resp, err := http.Get(link)
 			if err != nil {
@@ -171,7 +234,12 @@ func crawlURL(url string) ([]DocPage, error) {
 			var markdown string
 			mainContent := doc.Find("article, .markdown, .content, main, #main-content").First()
 			if mainContent.Length() > 0 {
-				markdown = mainContent.Text()
+				content, err := extractContent(mainContent)
+				if err != nil {
+					fmt.Printf("Error extracting content from %s: %v\n", link, err)
+					return
+				}
+				markdown = formatMarkdown(title, content)
 			}
 
 			if title != "" && markdown != "" {
@@ -191,81 +259,61 @@ func crawlURL(url string) ([]DocPage, error) {
 }
 
 func writeResults(pages []DocPage, dirPath string) error {
-	// Write the crawl results
-	resultsFile, err := os.Create(filepath.Join(dirPath, "crawl_results.json"))
+	// Write JSON file
+	jsonData, err := json.MarshalIndent(pages, "", "  ")
 	if err != nil {
 		return err
 	}
-	defer resultsFile.Close()
 
-	encoder := json.NewEncoder(resultsFile)
-	encoder.SetIndent("", "  ")
-	if err := encoder.Encode(pages); err != nil {
+	if err := os.WriteFile(filepath.Join(dirPath, "crawl_results.json"), jsonData, 0644); err != nil {
 		return err
 	}
 
 	// Write individual markdown files
 	for _, page := range pages {
-		// Sanitize the filename
-		filename := strings.Map(func(r rune) rune {
-			switch {
-			case r >= 'a' && r <= 'z':
-				return r
-			case r >= 'A' && r <= 'Z':
-				return r
-			case r >= '0' && r <= '9':
-				return r
-			case r == ' ' || r == '-' || r == '_' || r == '.':
-				return r
-			default:
-				return '_'
-			}
-		}, page.Title)
-
-		filename = strings.ToLower(filename) + ".md"
-		
-		mdFile, err := os.Create(filepath.Join(dirPath, "markdown", filename))
-		if err != nil {
+		filename := sanitizeFilename(page.Title)
+		filepath := filepath.Join(dirPath, "markdown", filename)
+		if err := os.WriteFile(filepath, []byte(page.Markdown), 0644); err != nil {
 			return err
 		}
-		defer mdFile.Close()
-
-		writer := bufio.NewWriter(mdFile)
-		_, err = writer.WriteString(page.Markdown)
-		if err != nil {
-			return err
-		}
-		writer.Flush()
 	}
 
 	return nil
 }
 
 func main() {
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Print("Enter the documentation website URL to crawl: ")
-	url, _ := reader.ReadString('\n')
-	url = strings.TrimSpace(url)
-
-	// Create directories
-	dirPath, err := createDirectories(url)
-	if err != nil {
-		fmt.Printf("Error creating directories: %v\n", err)
-		return
+	var url string
+	if len(os.Args) > 1 {
+		url = os.Args[1]
+	} else {
+		fmt.Print("Enter the documentation website URL to crawl: ")
+		fmt.Scanln(&url)
 	}
 
-	fmt.Printf("Starting to crawl %s...\n", url)
+	if url == "" {
+		fmt.Println("Error: URL is required")
+		os.Exit(1)
+	}
+
+	fmt.Println("Starting to crawl ...")
 	pages, err := crawlURL(url)
 	if err != nil {
 		fmt.Printf("Error crawling website: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
-	fmt.Printf("Found %d pages. Writing results...\n", len(pages))
-	if err := writeResults(pages, dirPath); err != nil {
+	// Create output directory
+	outputDir := filepath.Join(".", "generated_docs", strings.TrimPrefix(strings.TrimPrefix(url, "https://"), "http://"))
+	if err := os.MkdirAll(filepath.Join(outputDir, "markdown"), 0755); err != nil {
+		fmt.Printf("Error creating output directory: %v\n", err)
+		os.Exit(1)
+	}
+
+	// Write results
+	if err := writeResults(pages, outputDir); err != nil {
 		fmt.Printf("Error writing results: %v\n", err)
-		return
+		os.Exit(1)
 	}
 
-	fmt.Printf("Crawling complete! Results saved in %s\n", dirPath)
+	fmt.Printf("Successfully crawled %d pages. Results written to %s\n", len(pages), outputDir)
 }
