@@ -4,10 +4,11 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
-	"strings"
 	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -128,10 +129,22 @@ func (r *RateLimiter) Stop() {
 	r.ticker.Stop()
 }
 
+// Configuration for crawling
+var (
+	defaultWorkers = 4
+	defaultTimeout = 15 * time.Second
+	defaultDelay   = 1 * time.Second
+)
+
 func crawlURL(baseURL string) ([]DocPage, error) {
 	// Check robots.txt first
 	fmt.Println("Checking robots.txt...")
-	robotsURL := "https://www.remotion.dev/robots.txt"
+	baseURLParsed, err := url.Parse(baseURL)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse base URL: %v", err)
+	}
+	robotsURL := baseURLParsed.Scheme + "://" + baseURLParsed.Host + "/robots.txt"
+	
 	resp, err := http.Get(robotsURL)
 	if err != nil {
 		return nil, fmt.Errorf("failed to fetch robots.txt: %v", err)
@@ -149,7 +162,7 @@ func crawlURL(baseURL string) ([]DocPage, error) {
 	}
 
 	// Get crawl delay from robots.txt, default to 1 second if not specified
-	crawlDelay := 1 * time.Second
+	crawlDelay := defaultDelay
 	if group != nil && group.CrawlDelay > 0 {
 		crawlDelay = time.Duration(group.CrawlDelay) * time.Second
 	}
@@ -163,10 +176,8 @@ func crawlURL(baseURL string) ([]DocPage, error) {
 	fmt.Printf("\nStarting crawl from: %s\n", baseURL)
 	fmt.Printf("Rate limit: %v between requests\n", crawlDelay)
 
-	// Default to 4 workers as it provides optimal parallelization while staying
-	// well within typical browser connection limits. Combined with rate limiting,
-	// this gives good performance without overwhelming the target server.
-	workers := 4
+	// Use default workers unless specified in args
+	workers := defaultWorkers
 	if len(os.Args) > 2 {
 		if w, err := strconv.Atoi(os.Args[2]); err == nil && w > 0 {
 			workers = w
